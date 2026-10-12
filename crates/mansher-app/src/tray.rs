@@ -1,5 +1,5 @@
 //! StatusNotifier tray (ksni): the Linux analogue of upstream's menu-bar
-//! item — Show/Hide, Take everything down, Open screenshots folder,
+//! item: Show/Hide, Take everything down, Open screenshots folder,
 //! Sounds ✓, Launch at login ✓, Quit. Callbacks only send [`Msg`]; the
 //! GTK tick applies everything on the main thread, so no `Rc` crosses
 //! threads (the tray service owns its threads).
@@ -10,6 +10,29 @@ use ksni::{
     menu::{CheckmarkItem, Disposition, MenuItem, StandardItem},
     Tray,
 };
+
+/// Tray pixels, embedded at build time: the host tray looks up theme names
+/// on its own side, so a theme name would break under AppImage and unpacked
+/// runs. Pixmaps travel over the bus and work everywhere.
+const TRAY_PNG: &[u8] =
+    include_bytes!("../../../packaging/icons/hicolor/24x24/apps/io.github.mansher.Mansher.png");
+
+fn tray_pixmap() -> Vec<ksni::Icon> {
+    let Ok(img) = image::load_from_memory(TRAY_PNG) else {
+        return Vec::new();
+    };
+    let rgba = img.to_rgba8();
+    let (w, h) = (rgba.width(), rgba.height());
+    let mut argb = Vec::with_capacity((w * h * 4) as usize);
+    for p in rgba.pixels() {
+        argb.extend_from_slice(&[p[3], p[0], p[1], p[2]]);
+    }
+    vec![ksni::Icon {
+        width: w as i32,
+        height: h as i32,
+        data: argb,
+    }]
+}
 
 use crate::{settings::autostart_desktop, Msg};
 
@@ -54,9 +77,13 @@ impl Tray for MansherTray {
     }
 
     fn icon_name(&self) -> String {
-        // Freedesktop standard name; upstream ships a custom t-shirt icon
-        // we deliberately do not copy (rebrand).
-        "camera-photo".into()
+        // Empty on purpose: with no theme name the host takes icon_pixmap,
+        // which carries our own pixels instead of a stock lookup.
+        String::new()
+    }
+
+    fn icon_pixmap(&self) -> Vec<ksni::Icon> {
+        tray_pixmap()
     }
 
     /// Left-click toggles the line, like upstream's menu-bar toggle.
@@ -123,4 +150,21 @@ pub fn start(tx: mpsc::Sender<Msg>, sound_on: Arc<Mutex<bool>>) {
             Err(e) => eprintln!("mansher: tray unavailable: {e:#}"),
         }
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn tray_pixmap_decodes_embedded_png_to_argb() {
+        let icons = tray_pixmap();
+        assert_eq!(icons.len(), 1);
+        assert_eq!((icons[0].width, icons[0].height), (24, 24));
+        assert_eq!(icons[0].data.len(), 24 * 24 * 4);
+        // ARGB order: alpha first. The squircle corners stay transparent
+        // while the mark itself is opaque.
+        assert!(icons[0].data.iter().step_by(4).any(|&a| a == 255));
+        assert!(icons[0].data.iter().step_by(4).any(|&a| a == 0));
+    }
 }

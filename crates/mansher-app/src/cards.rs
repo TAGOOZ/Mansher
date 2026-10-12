@@ -510,8 +510,7 @@ fn card_widget(
     // whenever a decode is slower than the arrival, and the card would pop
     // in statically instead of dropping.
     let thumb = thumbs::cached_thumb(path);
-    let play_arrival =
-        frame.phase == Phase::Arriving && shared.borrow_mut().arrived.insert(id);
+    let play_arrival = frame.phase == Phase::Arriving && shared.borrow_mut().arrived.insert(id);
     if !play_arrival {
         outer.remove_css_class("marrive");
     }
@@ -1149,7 +1148,8 @@ mod tests {
     }
 
     #[test]
-    fn wrap_value_keeps_viewport_on_middle_copy() {        // pitch 1944 (6 cards x 324), page 1920: copies span [24, 5856],
+    fn wrap_value_keeps_viewport_on_middle_copy() {
+        // pitch 1944 (6 cards x 324), page 1920: copies span [24, 5856],
         // middle copy [1968, 3912].
         let (lower, upper, page, mid_lo, pitch) =
             (0.0, 24.0 + 3.0 * 1944.0, 1920.0, 24.0 + 1944.0, 1944.0);

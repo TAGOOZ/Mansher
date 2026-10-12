@@ -105,7 +105,8 @@ struct App {
     hovered: Option<u128>,
     /// Last rendered frames: the tick re-renders only on phase edges, so
     /// keyframes animations are never restarted by a rebuild mid-flight.
-    last_frames: Vec<CardFrame>,    /// Last painted card state, same order as the box children. Refresh
+    last_frames: Vec<CardFrame>,
+    /// Last painted card state, same order as the box children. Refresh
     /// diffs against this (not `last_frames`: the tick overwrites that gate
     /// copy before refresh runs, and it carries no badge/thumb info).
     rendered: Vec<cards::RenderedCard>,
@@ -192,11 +193,7 @@ fn apply_command(shared: &Shared, cmd: ShCmd) {
                 let mut app = shared.borrow_mut();
                 app.tuck_gen += 1;
                 let gen = app.tuck_gen;
-                (
-                    app.window.clone(),
-                    app.popover_root.clone(),
-                    gen,
-                )
+                (app.window.clone(), app.popover_root.clone(), gen)
             };
             // Quick tuck slide (220ms ease-in) first; unmap after, unless a
             // re-reveal in between cancelled this generation.

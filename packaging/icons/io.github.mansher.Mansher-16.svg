@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16" shape-rendering="crispEdges">
+  <!-- Wire: 2px thickness at y=3..4 -->
+  <rect x="0" y="3" width="16" height="2" fill="#78716C"/>
+
+  <!-- Card 1 (Left): 4x6 flat color block (Emerald / Slate-teal) -->
+  <rect x="1" y="6" width="4" height="6" fill="#0D9488" rx="0.5"/>
+  <!-- Pin 1: 1 single crisp shape (2x3) clamping wire & card -->
+  <rect x="2" y="2" width="2" height="3" fill="#E2E8F0"/>
+
+  <!-- Card 2 (Center Hero): 5x7 flat color block (Vibrant Amber / Terracotta) -->
+  <rect x="6" y="5" width="5" height="7" fill="#F97316" rx="0.5"/>
+  <!-- Pin 2: 1 single crisp shape (2x3) clamping wire & center card -->
+  <rect x="7" y="2" width="2" height="3" fill="#FFFFFF"/>
+
+  <!-- Card 3 (Right): 3x5 flat color block (Soft Sky / Indigo) -->
+  <rect x="12" y="6" width="3" height="5" fill="#38BDF8" rx="0.5"/>
+  <!-- Pin 3: 1 single crisp shape (2x3) clamping wire & right card -->
+  <rect x="12" y="2" width="2" height="3" fill="#E2E8F0"/>
+</svg>
