@@ -12,7 +12,7 @@ jobs:
       - name: Install GTK4 system deps
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-4-dev libadwaita-1-dev
+          sudo apt-get install -y libgtk-4-dev libadwaita-1-dev libgtk4-layer-shell-dev
       # gtk4 0.11 needs rustc 1.92; stable may lag behind.
       - uses: dtolnay/rust-toolchain@1.92
         with:
