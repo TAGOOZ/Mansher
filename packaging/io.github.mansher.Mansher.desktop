@@ -1,0 +1,15 @@
+[Desktop Entry]
+Name=Mansher
+Comment=Screenshots, hung out to dry
+Exec=mansher-app
+Icon=io.github.mansher.Mansher
+Terminal=false
+Type=Application
+Categories=Utility;GTK;
+StartupNotify=true
+Actions=Preferences;
+X-GNOME-Autostart-enabled=false
+
+[Desktop Action Preferences]
+Name=Preferences
+Exec=mansher-app --preferences

@@ -1,0 +1,78 @@
+app-id: io.github.mansher.Mansher
+runtime: org.gnome.Platform
+runtime-version: '51'
+sdk: org.gnome.Sdk
+command: mansher-app
+# Plan 015 least-privilege table, extended by the viewer pass: Mansher takes
+# no screenshots, so every grant below serves seeing files host tools wrote.
+# Each surviving arg names its code consumer.
+# Surviving args:
+# - --share=ipc: SHM-backed buffers alongside wayland. Consumers: raw
+#   layer-shell strip wl_shm pool (strip_raw.rs, WlShmPool create_buffer) +
+#   GTK overlay rendering (main.rs). Static only, needs human smoke.
+# - --socket=wayland: primary display path. Consumers: layer-shell hover strip
+#   (strip_raw.rs zwlr_layer_shell_v1), GTK overlay sensor
+#   (main.rs Sensor::LayerStrip), clipboard watch (clipwatch.rs start_wayland
+#   via wl-paste subprocess).
+# - --socket=pulseaudio: shutter sound. Consumer: settings.rs play_sound via
+#   canberra-gtk-play. Silent when absent, so this is polish, not function.
+# - --device=dri: GTK4 GL rendering. No code consumer; standard for GTK4
+#   flatpaks, falls back to software rendering without it.
+# - --talk-name=org.kde.StatusNotifierWatcher: tray icon via ksni (tray.rs
+#   MansherTray::new().spawn() in start()). Needs human smoke (icon appears).
+# - --own-name=org.kde.StatusNotifierItem-*: the other half of the tray.
+#   ksni provides this name on the session bus; the sandbox proxy denies
+#   owning it without the grant, so the icon silently never registers.
+# - --talk-name=org.gtk.vfs.*: GIO trash. Consumer: core drop() trash-first
+#   path. Without the gvfs talk grant, trashing from the sandbox fails.
+# - --filesystem=xdg-data/mansher:rw: the PRIMARY inbox. Consumer:
+#   mansher-core inbox_dir() (~/.local/share/mansher/Screenshots) plus
+#   clipwatch.rs clip saves. Without this grant the sandbox sees its own
+#   empty data dir while host capture tools write to the real one, so the
+#   viewer shows nothing on a foreign machine. Narrow subpath, not xdg-data.
+# - --filesystem=xdg-pictures/Screenshots:rw: external inbox watch
+#   (mansher-core lib.rs external_watch_dirs() Pictures/Screenshots branch).
+# - --filesystem=xdg-desktop:read-only: Desktop safety-net watch
+#   (mansher-core lib.rs external_watch_dirs() Desktop branch +
+#   is_desktop_candidate() Screenshot*/Capture* name filter). KEPT: a Desktop
+#   subpath grant is not expressible; dropping blinds the Desktop flow with no
+#   sandboxed alternative.
+# Dropped args (plan 022 re-adds NAMED portals when the ashpd spike lands):
+# - --talk-name=org.freedesktop.portal.*: nothing calls portals directly
+#   (ashpd deps commented out, mansher-app Cargo.toml:31; ipc.rs:5 "No
+#   portal"). Portal APIs on org.freedesktop.portal.Desktop are reachable from
+#   the sandbox by default per Flatpak docs (sandbox-permissions), so the
+#   wildcard grants nothing needed. xdg-open callers (main.rs open_path /
+#   open_folder) go through the sandbox shim. Removed 2026-10-11; re-add named
+#   portals only, one justification per portal.
+# - --socket=fallback-x11: Wayland-first app. clipwatch.rs start() branches on
+#   WAYLAND_DISPLAY (start_wayland/wl-paste vs start_x11/xclip poll); inside
+#   Flatpak with --socket=wayland, WAYLAND_DISPLAY is set so the X11 path is
+#   unreachable. X11-session users run native. Removed 2026-10-11.
+# Follow-ups outside this manifest: set_autostart writes ~/.config/autostart
+#   directly, which lands in the sandbox; Flatpak needs a Background portal
+#   request in code. line.json state stays sandbox-private under
+#   ~/.var/app, which is correct.
+finish-args:
+  - --share=ipc
+  - --socket=wayland
+  - --socket=pulseaudio
+  - --device=dri
+  - --talk-name=org.kde.StatusNotifierWatcher
+  - --own-name=org.kde.StatusNotifierItem-*
+  - --talk-name=org.gtk.vfs.*
+  - --filesystem=xdg-data/mansher:rw
+  - --filesystem=xdg-pictures/Screenshots:rw
+  - --filesystem=xdg-desktop:read-only
+modules:
+  - name: mansher
+    buildsystem: simple
+    build-commands:
+      - cargo --offline fetch || cargo fetch
+      - cargo build --release --locked -p mansher-app
+      - install -Dm755 target/release/mansher-app /app/bin/mansher-app
+      - install -Dm644 packaging/io.github.mansher.Mansher.desktop /app/share/applications/io.github.mansher.Mansher.desktop
+      - install -Dm644 packaging/io.github.mansher.Mansher.metainfo.xml /app/share/metainfo/io.github.mansher.Mansher.metainfo.xml
+    sources:
+      - type: dir
+        path: ../..

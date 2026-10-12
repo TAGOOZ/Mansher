@@ -1,0 +1,13 @@
+/target/
+# Binaries commit lockfiles: Cargo.lock is tracked for reproducible builds.
+*.flatpak
+.build/
+.repo/
+# Local planning notes, never pushed.
+/plans/
+# Built artifacts ship via GitHub Releases, not git.
+/Mansher-x86_64.AppImage
+*.AppImage
+/squashfs-root/
+# Internal design docs, not user facing.
+/docs/

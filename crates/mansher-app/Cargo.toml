@@ -1,0 +1,37 @@
+[package]
+name = "mansher-app"
+version = "0.1.0"
+edition = "2021"
+description = "Mansher clothesline UI: GTK4 overlay (layer-shell hybrid) + watcher + gestures"
+license = "MIT"
+
+# System deps per distro (README §Build):
+#   Ubuntu/Debian: sudo apt install libgtk-4-dev libadwaita-1-dev
+#   Fedora: sudo dnf install gtk4-devel libadwaita-devel
+#   Arch: sudo pacman -S gtk4 libadwaita
+
+[dependencies]
+mansher-core = { path = "../mansher-core" }
+anyhow = "1"
+arboard = { version = "3", features = ["wayland-data-control"] }
+directories = "6"
+chrono = "0.4"
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "bmp", "tiff", "gif", "webp"] }
+gtk4 = { version = "0.11", features = ["v4_10"] }
+gtk4-layer-shell = { version = "0.8", optional = true }
+wayland-client = "0.31"
+wayland-protocols-wlr = "0.3"
+libc = "0.2.190"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+ksni = { version = "0.3.6", features = ["blocking"] }
+
+# Portal capture/shortcuts (Screenshot, GlobalShortcuts, OpenURI, Trash, Background).
+# Async via tokio; lands after the overlay slice is solid.
+# ashpd = { version = "0.10", optional = true, features = ["screenshot", "global_shortcuts", "open_uri", "trash", "background"] }
+# tokio = { version = "1", optional = true, features = ["rt-multi-thread", "macros"] }
+
+[features]
+default = ["layer-shell"]
+# Layer-shell hover strip for wlroots/KDE/Niri. GNOME/X11 use fallback mode.
+layer-shell = ["dep:gtk4-layer-shell"]
