@@ -32,7 +32,7 @@ pub mod layout {
     pub const CARD_WIDTH: f64 = (150.0 * SCALE) as i32 as f64;
     pub const SPACING: f64 = CARD_WIDTH + 24.0;
     /// Window height: photo + pin/margins/hint + 8px headroom. The headroom
-    /// is load-bearing: mhover scale(1.07) grows cards downward from the pin
+    /// is load-bearing: mhover scale(1.035) grows cards downward from the pin
     /// (transform-origin top), and the hint pill sits below the row — without
     /// it the hovered bottom clips against the window.
     pub const PANEL_HEIGHT: f64 = PHOTO_MAX_H as f64 + 114.0;
@@ -52,7 +52,7 @@ pub mod layout {
     /// within every pin body (pins hang from it now, cards don't follow the
     /// curve). Matches upstream's 30px sag.
     pub fn sag(width: f64) -> f64 {
-        (width * 0.016).min(30.0)
+        (width * 0.018).min(30.0)
     }
 
     pub fn rope_y(x: f64, width: f64) -> f64 {

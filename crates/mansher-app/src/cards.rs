@@ -76,10 +76,22 @@ pub(crate) fn refresh(shared: &Shared) {
         let old = std::mem::take(&mut app.rendered);
         let mut map = std::mem::take(&mut app.card_widgets);
         let mut outers = std::mem::take(&mut app.card_outers);
+        // One copy when the row fits (no wrap, no visible duplicates),
+        // three when it overflows (the tick wraps drift by one pitch).
+        let copies = copy_count(&items, &app.size_cache, app.scroll.allocated_width());
+        app.rendered_copies = copies;
         // Release the App borrow before building widgets: card_widget
         // re-borrows shared for hover state and the size cache.
         drop(app);
-        let stats = patch_cards(&cards_box, &mut map, &mut outers, &old, &items, shared);
+        let stats = patch_cards(
+            &cards_box,
+            &mut map,
+            &mut outers,
+            &old,
+            &items,
+            copies,
+            shared,
+        );
         let mut app = shared.borrow_mut();
         app.card_widgets = map;
         app.card_outers = outers;
@@ -135,7 +147,46 @@ fn press_onset(old: &RenderedCard, new: &RenderedCard) -> bool {
 /// Copies of the peg list rendered for the endless row. The user lives on
 /// the middle copy; the tick wraps the adjustment by one copy pitch at the
 /// edges, which reads as seamless because all copies are identical.
+/// Maximum: `copy_count` drops to a single copy when the whole row fits the
+/// viewport — with a short line all three copies would sit side by side and
+/// every photo would show twice.
 pub(crate) const LOOP_COPIES: u8 = 3;
+
+/// How many row copies to render: one when the row fits the viewport (no
+/// wrap needed, and duplicates would show side by side), three when it
+/// overflows. Widths come from the size cache only — never decode here;
+/// unknown widths fall back to max, which only errs toward three copies
+/// until thumbs land (and their arrival triggers a recount anyway).
+pub(crate) fn copy_count(
+    items: &[RenderedCard],
+    cache: &RefCell<SizeCache>,
+    viewport_w: i32,
+) -> u8 {
+    if items.is_empty() {
+        return 1;
+    }
+    if viewport_w <= 0 {
+        return LOOP_COPIES; // unmapped: keep today's layout, recount on map
+    }
+    let cached = cache.borrow();
+    let single: f64 = 48.0
+        + items
+            .iter()
+            .map(|r| {
+                cached
+                    .get(&r.path)
+                    .map(|&(_, _, (w, _))| w as f64)
+                    .unwrap_or(layout::PHOTO_MAX_W as f64)
+                    + 8.0
+                    + 24.0
+            })
+            .sum::<f64>();
+    if single + 64.0 <= viewport_w as f64 {
+        1
+    } else {
+        LOOP_COPIES
+    }
+}
 
 /// Wrap `v` into the middle copy's span so the endless row never shows an
 /// end. `mid_lo` is copy 1's measured start and `pitch` the measured copy
@@ -178,9 +229,16 @@ fn patch_cards(
     outers: &mut HashMap<(u8, u128), gtk::Overlay>,
     old: &[RenderedCard],
     new: &[RenderedCard],
+    copies: u8,
     shared: &Shared,
 ) -> (usize, usize, bool) {
     let old_ids: Vec<u128> = old.iter().map(|r| r.frame.id).collect();
+    // One-shot arrivals: forget ids that left the line so the set stays
+    // bounded to live pegs.
+    {
+        let live: HashSet<u128> = new.iter().map(|r| r.frame.id).collect();
+        shared.borrow_mut().arrived.retain(|id| live.contains(id));
+    }
     let survivors_in_old_order: Vec<u128> = old_ids
         .iter()
         .filter(|id| new.iter().any(|r| r.frame.id == **id))
@@ -206,7 +264,7 @@ fn patch_cards(
             outers.remove(&key);
         }
         let mut prev: Option<gtk::Widget> = None;
-        for copy in 0..LOOP_COPIES {
+        for copy in 0..copies {
             for r in new {
                 let id = r.frame.id;
                 let key = (copy, id);
@@ -221,7 +279,7 @@ fn patch_cards(
                         // Press began: swap phase classes on every live copy.
                         // Rebuilding here would destroy the gesture's own
                         // widget — press without release, click without fire.
-                        for c in 0..LOOP_COPIES {
+                        for c in 0..copies {
                             if let Some(outer) = outers.get(&(c, id)) {
                                 for cls in phase_classes(&o.frame) {
                                     outer.remove_css_class(&cls);
@@ -250,7 +308,7 @@ fn patch_cards(
                 built += 1;
             }
         }
-        debug_assert_eq!(map.len(), LOOP_COPIES as usize * new.len());
+        debug_assert_eq!(map.len(), copies as usize * new.len());
         (built, removed, false)
     } else {
         let mut cleared = 0;
@@ -261,7 +319,7 @@ fn patch_cards(
         map.clear();
         outers.clear();
         let mut built = 0;
-        for copy in 0..LOOP_COPIES {
+        for copy in 0..copies {
             for r in new {
                 let (w, outer) = card_widget(shared, &r.frame, &r.path, r.badge);
                 cards.append(&w);
@@ -446,6 +504,17 @@ fn card_widget(
     for class in phase_classes(frame) {
         outer.add_css_class(&class);
     }
+    // Arrival is a one-shot from hang: the blank frame drops immediately and
+    // the thumb swaps in mid-flight without replaying (the id stays claimed
+    // in `arrived`). Waiting for the thumb first would miss the window
+    // whenever a decode is slower than the arrival, and the card would pop
+    // in statically instead of dropping.
+    let thumb = thumbs::cached_thumb(path);
+    let play_arrival =
+        frame.phase == Phase::Arriving && shared.borrow_mut().arrived.insert(id);
+    if !play_arrival {
+        outer.remove_css_class("marrive");
+    }
     vbox.append(&outer);
 
     let pin = pin_widget();
@@ -456,7 +525,7 @@ fn card_widget(
     let (pw, ph) = photo_display_size(&shared.borrow().size_cache, path);
     // Thumbs keep natural size == display size, so rows always fit.
     // Before its thumb lands, a fixed empty frame holds the exact layout.
-    if let Some(thumb) = thumbs::cached_thumb(path) {
+    if let Some(thumb) = thumb {
         let pic = gtk::Picture::for_filename(&thumb);
         pic.set_can_shrink(false);
         pic.set_size_request(pw, ph);
@@ -874,7 +943,7 @@ pub(crate) fn apply_css() {
             box-shadow: 0 5px 10px rgba(0, 0, 0, 0.18), 0 8px 14px rgba(0, 0, 0, 0.10);
             padding: 4px;
             transform-origin: 50% 0%;
-            transition: transform 130ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 130ms ease-out;
+            transition: transform 0.3s cubic-bezier(0.3, 1.6, 0.5, 1), box-shadow 0.18s ease-out, opacity 0.2s;
         }
         /* TODO: clip photo to concentric corners. GTK CSS has no `overflow`
            property, so square photo corners show inside the rounded frame.
@@ -907,42 +976,62 @@ pub(crate) fn apply_css() {
            on the outer column, motion on the inner card node, so the two
            transforms multiply instead of overwriting each other. */
         @keyframes marrive {
-            0% { transform: rotate(-6deg) translateY(-14px); opacity: 0; }
-            60% { transform: rotate(2deg) translateY(2px); opacity: 1; }
+            0% { transform: rotate(16deg) translateY(-46px); opacity: 0; }
+            30% { transform: rotate(-2deg) translateY(3px); opacity: 1; }
+            45% { transform: rotate(1.4deg) translateY(-1px); opacity: 1; }
+            60% { transform: rotate(-0.7deg) translateY(0px); opacity: 1; }
+            75% { transform: rotate(0.35deg) translateY(0px); opacity: 1; }
             100% { transform: rotate(0deg) translateY(0px); opacity: 1; }
         }
         .marrive {
-            animation: marrive 0.65s cubic-bezier(0.65, 0, 0.35, 1) forwards;
+            animation: marrive 1.1s cubic-bezier(0.2, 0.9, 0.22, 1.04) forwards;
         }
         @keyframes mbreeze {
-            0% { transform: rotate(-1.5deg); }
-            50% { transform: rotate(1.5deg); }
-            100% { transform: rotate(-1.5deg); }
+            0% { transform: rotate(0deg); }
+            25% { transform: rotate(2.4deg); }
+            50% { transform: rotate(-1.2deg); }
+            75% { transform: rotate(0.5deg); }
+            100% { transform: rotate(0deg); }
         }
         .mbreeze {
-            animation: mbreeze 1.4s ease-in-out;
+            animation: mbreeze 0.9s ease-out;
         }
         .mbreeze.d0 { animation-delay: 0ms; }
         .mbreeze.d1 { animation-delay: 90ms; }
         .mbreeze.d2 { animation-delay: 180ms; }
         .mbreeze.d3 { animation-delay: 270ms; }
         @keyframes mcopy {
-            0% { transform: translateX(0px); }
-            30% { transform: translateX(3px); }
-            60% { transform: translateX(-2px); }
-            100% { transform: translateX(0px); }
+            0% { transform: rotate(0deg); }
+            40% { transform: rotate(3deg); }
+            100% { transform: rotate(0deg); }
         }
         .mcopy {
-            animation: mcopy 0.45s ease-in-out;
+            animation: mcopy 0.3s ease-out;
         }
         .mhover {
-            transform: scale(1.07);
-            box-shadow: 0 12px 24px rgba(0, 0, 0, 0.28), 0 4px 8px rgba(0, 0, 0, 0.12);
+            transform: scale(1.035);
+            box-shadow: 0 8px 14px rgba(0, 0, 0, 0.14), 0 8px 28px rgba(0, 0, 0, 0.12);
         }
-        /* 450ms matches HOLD_MS: slow press-in, release eases back on base 130ms. */
+        /* 450ms matches HOLD_MS: slow press-in, release eases back on base 0.3s. */
         .mpressed {
-            transition-duration: 450ms;
+            transition: transform 0.45s ease-in-out, box-shadow 0.18s ease-out;
             transform: scale(0.95);
+        }
+        /* Line reveal/tuck (upstream Line.frame): down on a 0.42s spring,
+           up on a quick 220ms ease-in. Span = PANEL_HEIGHT (322) + 12. */
+        @keyframes mdrop {
+            from { transform: translateY(-334px); }
+            to { transform: translateY(0px); }
+        }
+        .mreveal {
+            animation: mdrop 0.42s cubic-bezier(0.2, 0.9, 0.22, 1.04);
+        }
+        @keyframes mtuck {
+            from { transform: translateY(0px); }
+            to { transform: translateY(-334px); }
+        }
+        .mtuck {
+            animation: mtuck 0.22s ease-in forwards;
         }
     ",
     );
@@ -1039,8 +1128,28 @@ mod tests {
     }
 
     #[test]
-    fn wrap_value_keeps_viewport_on_middle_copy() {
-        // pitch 1944 (6 cards x 324), page 1920: copies span [24, 5856],
+    fn copy_count_single_when_row_fits_triple_when_overflowing() {
+        let cache = RefCell::new(SizeCache::new());
+        let one = vec![rendered_card(1, Phase::Rest, false)];
+        assert_eq!(copy_count(&one, &cache, 1920), 1);
+        assert_eq!(copy_count(&one, &cache, 0), LOOP_COPIES);
+        assert_eq!(copy_count(&[], &cache, 1920), 1);
+        // Unknown widths fall back to max: 8 max-wide cards overflow 1920.
+        let many: Vec<RenderedCard> = (1..=8)
+            .map(|id| rendered_card(id, Phase::Rest, false))
+            .collect();
+        assert_eq!(copy_count(&many, &cache, 1920), LOOP_COPIES);
+        // Known narrow thumbs fit: same 8 at 100px each stay single.
+        for r in &many {
+            cache
+                .borrow_mut()
+                .insert(r.path.clone(), (1, 1, (100, 100)));
+        }
+        assert_eq!(copy_count(&many, &cache, 1920), 1);
+    }
+
+    #[test]
+    fn wrap_value_keeps_viewport_on_middle_copy() {        // pitch 1944 (6 cards x 324), page 1920: copies span [24, 5856],
         // middle copy [1968, 3912].
         let (lower, upper, page, mid_lo, pitch) =
             (0.0, 24.0 + 3.0 * 1944.0, 1920.0, 24.0 + 1944.0, 1944.0);

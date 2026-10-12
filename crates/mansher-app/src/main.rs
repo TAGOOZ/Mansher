@@ -20,7 +20,7 @@ mod trash;
 mod tray;
 
 use std::cell::{Cell, RefCell};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::sync::{mpsc, Arc, Mutex};
@@ -105,8 +105,7 @@ struct App {
     hovered: Option<u128>,
     /// Last rendered frames: the tick re-renders only on phase edges, so
     /// keyframes animations are never restarted by a rebuild mid-flight.
-    last_frames: Vec<CardFrame>,
-    /// Last painted card state, same order as the box children. Refresh
+    last_frames: Vec<CardFrame>,    /// Last painted card state, same order as the box children. Refresh
     /// diffs against this (not `last_frames`: the tick overwrites that gate
     /// copy before refresh runs, and it carries no badge/thumb info).
     rendered: Vec<cards::RenderedCard>,
@@ -124,6 +123,17 @@ struct App {
     /// Singleton Preferences window (tray item presents it).
     prefs: prefs::PrefsWindow,
     tick_count: u64,
+    /// Reveal/tuck generation: Hide plays the 220ms tuck slide before
+    /// unmapping, and a re-reveal inside that window cancels the hide.
+    tuck_gen: u64,
+    /// Arrival played per card id: the drop-in is a one-shot. Rebuilds
+    /// (thumb landing, badge flip) must not replay it mid-flight, or the
+    /// card visibly drops twice.
+    arrived: HashSet<u128>,
+    /// Row copies currently rendered (1 when the row fits the viewport,
+    /// 3 when it overflows for the endless wrap). The tick recounts and
+    /// refreshes on change.
+    rendered_copies: u8,
 }
 
 type Shared = Rc<RefCell<App>>;
@@ -163,14 +173,46 @@ fn apply_command(shared: &Shared, cmd: ShCmd) {
         ShCmd::Noop => {}
         ShCmd::Reveal => {
             eprintln!("mansher: reveal");
-            let window = shared.borrow().window.clone();
+            let (window, root) = {
+                let mut app = shared.borrow_mut();
+                app.tuck_gen += 1;
+                (app.window.clone(), app.popover_root.clone())
+            };
             window.set_visible(true);
+            // Slide down on the upstream spring (0.42s); re-adding the class
+            // restarts the keyframes run each reveal.
+            root.remove_css_class("mtuck");
+            root.remove_css_class("mreveal");
+            root.add_css_class("mreveal");
         }
         ShCmd::Hide => {
             eprintln!("mansher: hide");
             shared.borrow_mut().menu_pop.take();
-            let window = shared.borrow().window.clone();
-            window.set_visible(false);
+            let (window, root, gen) = {
+                let mut app = shared.borrow_mut();
+                app.tuck_gen += 1;
+                let gen = app.tuck_gen;
+                (
+                    app.window.clone(),
+                    app.popover_root.clone(),
+                    gen,
+                )
+            };
+            // Quick tuck slide (220ms ease-in) first; unmap after, unless a
+            // re-reveal in between cancelled this generation.
+            root.remove_css_class("mreveal");
+            root.add_css_class("mtuck");
+            let shared_hide = Rc::clone(shared);
+            gtk::glib::timeout_add_local_once(Duration::from_millis(220), move || {
+                let still = {
+                    let app = shared_hide.borrow();
+                    app.tuck_gen == gen && !app.showhide.revealed
+                };
+                if still {
+                    root.remove_css_class("mtuck");
+                    window.set_visible(false);
+                }
+            });
         }
     }
 }
@@ -499,6 +541,9 @@ fn build_ui(
         sound_on: Arc::clone(&sound_on),
         prefs: prefs::PrefsWindow::new(),
         tick_count: 0,
+        tuck_gen: 0,
+        arrived: HashSet::new(),
+        rendered_copies: 3,
     }));
 
     // Upstream itemsChanged: a non-empty line is wanted from the start.
@@ -792,6 +837,17 @@ fn build_ui(
             let frames = app.visuals.frames(&pegs, hints);
             if frames != app.last_frames {
                 app.last_frames = frames;
+                dirty = true;
+            }
+            // Row copies: a short row fits the viewport (single copy, no
+            // visible duplicates); a long one needs all three for the wrap.
+            // Recount here so resize/overflow flips rebuild once, not never.
+            let copies = crate::cards::copy_count(
+                &app.rendered,
+                &app.size_cache,
+                app.scroll.allocated_width(),
+            );
+            if copies != app.rendered_copies {
                 dirty = true;
             }
         }

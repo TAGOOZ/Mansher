@@ -3,7 +3,7 @@
 //! One structure replaces scattered press / copied checks at card
 //! build time. Precedence: press dominates hover, arrival dominates rest,
 //! gust only from rest while revealed. Copy nudge is
-//! an orthogonal overlay (450ms) while the badge lives 1200ms in the app.
+//! an orthogonal overlay (300ms) while the badge lives 1200ms in the app.
 
 use std::collections::{HashMap, HashSet};
 
@@ -12,11 +12,11 @@ use super::Peg;
 /// Milliseconds since an arbitrary epoch. Passed in so tests use a fake clock.
 pub type Ms = u64;
 
-const ARRIVAL_MS: Ms = 650;
+const ARRIVAL_MS: Ms = 1100;
 const GUST_MS: Ms = 900;
 const GUST_MIN_MS: Ms = 7000;
 const GUST_SPREAD_MS: Ms = 9000;
-const NUDGE_MS: Ms = 450;
+const NUDGE_MS: Ms = 300;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Phase {
@@ -196,8 +196,10 @@ mod tests {
             f[0].tilt_deg, 1.5,
             "tilt frozen at hang, later peg tilt ignored"
         );
-        let f = v.frames(&[peg(1, -2.0, false)], hints(1700));
-        assert_eq!(f[0].phase, Phase::Rest, "arrival window ends by 650ms");
+        let f = v.frames(&[peg(1, -2.0, false)], hints(1000 + 1099));
+        assert_eq!(f[0].phase, Phase::Arriving, "settle wobble still playing");
+        let f = v.frames(&[peg(1, -2.0, false)], hints(1000 + 1100));
+        assert_eq!(f[0].phase, Phase::Rest, "arrival window ends by 1100ms");
     }
 
     #[test]
@@ -229,7 +231,7 @@ mod tests {
     fn press_beats_hover() {
         let mut v = CardVisuals::new();
         v.hung(1, 0.0, 0);
-        let f = v.frames(&[peg(1, 0.0, false)], hints(1000));
+        let f = v.frames(&[peg(1, 0.0, false)], hints(1200));
         assert_eq!(f[0].phase, Phase::Rest, "settled before interaction");
         let h = UiHints {
             hovered: Some(1),
