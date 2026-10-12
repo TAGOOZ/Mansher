@@ -73,6 +73,8 @@ modules:
       - install -Dm755 target/release/mansher-app /app/bin/mansher-app
       - install -Dm644 packaging/io.github.mansher.Mansher.desktop /app/share/applications/io.github.mansher.Mansher.desktop
       - install -Dm644 packaging/io.github.mansher.Mansher.metainfo.xml /app/share/metainfo/io.github.mansher.Mansher.metainfo.xml
+      - install -Dm644 packaging/icons/hicolor/scalable/apps/io.github.mansher.Mansher.svg /app/share/icons/hicolor/scalable/apps/io.github.mansher.Mansher.svg
+      - for s in 16 24 32 48 64 128 256 512; do install -Dm644 packaging/icons/hicolor/${s}x${s}/apps/io.github.mansher.Mansher.png /app/share/icons/hicolor/${s}x${s}/apps/io.github.mansher.Mansher.png; done
     sources:
       - type: dir
         path: ../..

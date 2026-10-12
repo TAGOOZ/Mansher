@@ -1,0 +1,183 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Drop shadows -->
+    <filter id="card-shadow" x="-20%" y="-20%" width="150%" height="150%">
+      <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#0f172a" flood-opacity="0.18"/>
+    </filter>
+    <filter id="subtle-glow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#000000" flood-opacity="0.10"/>
+    </filter>
+    <filter id="clip-shadow" x="-30%" y="-20%" width="160%" height="150%">
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#000" flood-opacity="0.22"/>
+    </filter>
+
+    <!-- Center Card: Cyan & Emerald Aurora Mountain / Celestial Landscape -->
+    <linearGradient id="aurora-sky" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#064E3B"/>
+      <stop offset="30%" stop-color="#0284C7"/>
+      <stop offset="70%" stop-color="#06B6D4"/>
+      <stop offset="100%" stop-color="#34D399"/>
+    </linearGradient>
+
+    <!-- Metallic Clothespin Gradient -->
+    <linearGradient id="metal-clip" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#C5CBD3"/>
+      <stop offset="30%" stop-color="#F1F5F9"/>
+      <stop offset="70%" stop-color="#E2E8F0"/>
+      <stop offset="100%" stop-color="#94A3B8"/>
+    </linearGradient>
+
+    <!-- Wire Stroke Gradient -->
+    <linearGradient id="wire-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#9CA3AF" stop-opacity="0.4"/>
+      <stop offset="50%" stop-color="#64748B" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#9CA3AF" stop-opacity="0.4"/>
+    </linearGradient>
+
+    <!-- App container backdrop gradient -->
+    <linearGradient id="banner-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F1F5F9"/>
+      <stop offset="50%" stop-color="#F8FAFC"/>
+      <stop offset="100%" stop-color="#FDF4F0"/>
+    </linearGradient>
+
+    <!-- Clip path to strictly contain center card artwork and prevent overflowing shades -->
+    <clipPath id="center-art-clip">
+      <rect x="0" y="0" width="148" height="194" rx="10"/>
+    </clipPath>
+  </defs>
+
+  <!-- App Icon Base: Squircle Frame -->
+  <rect x="24" y="24" width="464" height="464" rx="108" fill="url(#banner-bg)" stroke="#FFFFFF" stroke-width="4" filter="url(#subtle-glow)"/>
+
+  <!-- Top Window/Bar Header Chrome -->
+  <g opacity="0.6">
+    <circle cx="68" cy="72" r="5" fill="#94A3B8"/>
+    <rect x="84" y="68" width="28" height="8" rx="4" fill="#94A3B8"/>
+    <rect x="120" y="68" width="22" height="8" rx="4" fill="#94A3B8"/>
+    <rect x="150" y="68" width="22" height="8" rx="4" fill="#94A3B8"/>
+
+    <rect x="362" y="68" width="16" height="8" rx="3" fill="#94A3B8"/>
+    <rect x="386" y="68" width="16" height="8" rx="3" fill="#94A3B8"/>
+    <rect x="410" y="68" width="16" height="8" rx="3" fill="#94A3B8"/>
+    <rect x="434" y="68" width="16" height="8" rx="3" fill="#94A3B8"/>
+
+    <!-- Subtle cursor pointer -->
+    <path d="M 284,94 L 284,116 L 290,111 L 296,122 L 299,120 L 293,109 L 300,109 Z" fill="#1E293B"/>
+  </g>
+
+  <!-- The Hanging Clothesline Wire -->
+  <path d="M 24,142 Q 256,168 488,144" fill="none" stroke="url(#wire-grad)" stroke-width="3" stroke-linecap="round"/>
+
+  <!-- ==================== CARD 1: LEFT (IDE / Code Editor with Syntax Highlighting) ==================== -->
+  <g transform="rotate(-3 138 270)" filter="url(#card-shadow)">
+    <!-- Window Body -->
+    <rect x="62" y="152" width="152" height="196" rx="14" fill="#0F172A" stroke="#334155" stroke-width="1.5"/>
+    <!-- Top Header Bar -->
+    <rect x="62" y="152" width="152" height="26" rx="14" fill="#1E293B"/>
+    <rect x="62" y="166" width="152" height="12" fill="#1E293B"/>
+    <!-- Window traffic lights -->
+    <circle cx="76" cy="165" r="3.5" fill="#EF4444"/>
+    <circle cx="87" cy="165" r="3.5" fill="#F59E0B"/>
+    <circle cx="98" cy="165" r="3.5" fill="#10B981"/>
+    <!-- Tab Pill -->
+    <rect x="114" y="158" width="54" height="14" rx="4" fill="#0F172A"/>
+    <rect x="122" y="163" width="38" height="4" rx="2" fill="#38BDF8"/>
+
+    <!-- Code Editor Content with Syntax Colors -->
+    <rect x="76" y="192" width="22" height="6" rx="3" fill="#F43F5E"/>
+    <rect x="103" y="192" width="56" height="6" rx="3" fill="#38BDF8"/>
+    <rect x="163" y="192" width="12" height="6" rx="3" fill="#94A3B8"/>
+    <rect x="86" y="208" width="28" height="6" rx="3" fill="#A855F7"/>
+    <rect x="118" y="208" width="42" height="6" rx="3" fill="#E2E8F0"/>
+    <rect x="86" y="224" width="36" height="6" rx="3" fill="#10B981"/>
+    <rect x="126" y="224" width="52" height="6" rx="3" fill="#FBBF24"/>
+    <rect x="96" y="240" width="60" height="6" rx="3" fill="#38BDF8"/>
+    <rect x="160" y="240" width="24" height="6" rx="3" fill="#F43F5E"/>
+    <rect x="96" y="256" width="44" height="6" rx="3" fill="#E2E8F0"/>
+    <rect x="144" y="256" width="38" height="6" rx="3" fill="#34D399"/>
+    <rect x="86" y="272" width="32" height="6" rx="3" fill="#F43F5E"/>
+    <rect x="122" y="272" width="48" height="6" rx="3" fill="#38BDF8"/>
+    <rect x="76" y="288" width="14" height="6" rx="3" fill="#94A3B8"/>
+    <rect x="94" y="288" width="3" height="8" rx="1.5" fill="#38BDF8"/>
+  </g>
+
+  <!-- ==================== CARD 3: RIGHT (Warm Amber Waveform & Telemetry Monitor) ==================== -->
+  <g transform="rotate(2 376 270)" filter="url(#card-shadow)">
+    <!-- Window Body -->
+    <rect x="300" y="154" width="152" height="196" rx="14" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.5"/>
+    <!-- Header with badge & indicator -->
+    <rect x="314" y="170" width="46" height="8" rx="4" fill="#F97316"/>
+    <circle cx="434" cy="174" r="4" fill="#22C55E"/>
+    <rect x="314" y="186" width="124" height="1" fill="#F1F5F9"/>
+
+    <!-- Waveform / Spectrum Audio-Data Visualization -->
+    <g transform="translate(312, 198)">
+      <path d="M 4,40 Q 18,10 32,38 T 60,35 T 88,18 T 116,42 T 126,38" fill="none" stroke="#F97316" stroke-width="3" stroke-linecap="round"/>
+      <path d="M 4,52 Q 22,25 40,50 T 70,30 T 100,60 T 126,48" fill="none" stroke="#FBBF24" stroke-width="2" stroke-linecap="round" opacity="0.75"/>
+      <rect x="4" y="74" width="36" height="18" rx="4" fill="#FEF3C7"/>
+      <rect x="10" y="80" width="24" height="6" rx="3" fill="#D97706"/>
+      <rect x="46" y="74" width="42" height="18" rx="4" fill="#FFEDD5"/>
+      <rect x="52" y="80" width="30" height="6" rx="3" fill="#EA580C"/>
+      <rect x="94" y="74" width="30" height="18" rx="4" fill="#F1F5F9"/>
+      <rect x="100" y="80" width="18" height="6" rx="3" fill="#94A3B8"/>
+      <rect x="4" y="108" width="120" height="6" rx="3" fill="#E2E8F0"/>
+      <rect x="4" y="108" width="78" height="6" rx="3" fill="#F97316"/>
+      <circle cx="82" cy="111" r="5" fill="#EA580C"/>
+    </g>
+  </g>
+
+  <!-- ==================== CARD 2: CENTER (Emerald Aurora & Crescent Moon Landscape) ==================== -->
+  <g filter="url(#card-shadow)">
+    <!-- Photo card frame with white border -->
+    <rect x="176" y="162" width="160" height="206" rx="14" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="2"/>
+
+    <!-- Artwork preview area strictly clipped inside card boundaries -->
+    <g transform="translate(182, 168)" clip-path="url(#center-art-clip)">
+      <rect x="0" y="0" width="148" height="194" rx="10" fill="url(#aurora-sky)"/>
+
+      <!-- Glowing Crescent Moon & Stars -->
+      <path d="M 112,38 A 16,16 0 1,0 126,62 A 13,13 0 1,1 112,38 Z" fill="#FEF08A"/>
+      <circle cx="38" cy="46" r="1.5" fill="#FFFFFF" opacity="0.8"/>
+      <circle cx="74" cy="32" r="2" fill="#FFFFFF" opacity="0.9"/>
+      <circle cx="58" cy="68" r="1.5" fill="#FFFFFF" opacity="0.6"/>
+      <circle cx="92" cy="74" r="1.8" fill="#FFFFFF" opacity="0.85"/>
+
+      <!-- Cosmic Aurora Wave Ribbon (Clipped cleanly within the card) -->
+      <path d="M 0,105 Q 40,65 90,95 T 148,75 L 148,194 L 0,194 Z" fill="#67E8F9" opacity="0.35"/>
+      <path d="M 0,120 Q 30,85 75,115 T 148,95 L 148,194 L 0,194 Z" fill="#34D399" opacity="0.45"/>
+
+      <!-- Crisp Geometric Mountain Ridges (Clipped cleanly within the card) -->
+      <polygon points="0,194 36,128 78,172 118,122 148,165 148,194" fill="#064E3B" opacity="0.85"/>
+      <polygon points="0,194 54,142 98,185 148,136 148,194" fill="#022C22"/>
+    </g>
+  </g>
+
+  <!-- ==================== CLOTHESPINS / CLIPS ==================== -->
+  <!-- Clip 1 (Left Card Clip) -->
+  <g transform="rotate(-3 138 270)" filter="url(#clip-shadow)">
+    <rect x="133" y="136" width="10" height="34" rx="4" fill="url(#metal-clip)" stroke="#64748B" stroke-width="1"/>
+    <rect x="136" y="146" width="4" height="14" rx="2" fill="#475569"/>
+    <circle cx="138" cy="153" r="2.5" fill="#E2E8F0"/>
+  </g>
+
+  <!-- Clip 2 (Center Card Clip) -->
+  <g filter="url(#clip-shadow)">
+    <rect x="251" y="146" width="10" height="34" rx="4" fill="url(#metal-clip)" stroke="#64748B" stroke-width="1"/>
+    <rect x="254" y="156" width="4" height="14" rx="2" fill="#475569"/>
+    <circle cx="256" cy="163" r="2.5" fill="#E2E8F0"/>
+  </g>
+
+  <!-- Clip 3 (Right Card Clip) -->
+  <g transform="rotate(2 376 270)" filter="url(#clip-shadow)">
+    <rect x="371" y="138" width="10" height="34" rx="4" fill="url(#metal-clip)" stroke="#64748B" stroke-width="1"/>
+    <rect x="374" y="148" width="4" height="14" rx="2" fill="#475569"/>
+    <circle cx="376" cy="155" r="2.5" fill="#E2E8F0"/>
+  </g>
+
+  <!-- Brand Typography Below -->
+  <g transform="translate(256, 420)" text-anchor="middle">
+    <text font-family="-apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif" font-weight="700" font-size="28" fill="#0F172A" letter-spacing="-0.5">Mansher</text>
+    <text y="24" font-family="-apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif" font-weight="500" font-size="13" fill="#64748B" letter-spacing="0.2">Screenshots, hung out to dry.</text>
+  </g>
+</svg>

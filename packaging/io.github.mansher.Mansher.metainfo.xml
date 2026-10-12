@@ -9,9 +9,7 @@
     <p>Private by design: no account, no network, no analytics.</p>
   </description>
   <launchable type="desktop-id">io.github.mansher.Mansher.desktop</launchable>
-  <!-- Stock icon matches the tray (tray.rs camera-photo). A shipped brand
-    icon is still wanted; see the Flathub gaps note in README Distribute. -->
-  <icon type="stock">camera-photo</icon>
+  <!-- Icon ships in hicolor under the app id; no remote icon tag. -->
   <developer>
     <name>Mansher</name>
   </developer>
