@@ -9,7 +9,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - name: Install GTK4 system deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-4-dev libadwaita-1-dev
+      # gtk4 0.11 needs rustc 1.92; stable may lag behind.
+      - uses: dtolnay/rust-toolchain@1.92
         with:
           components: rustfmt, clippy
       - name: Format
