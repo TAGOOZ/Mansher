@@ -12,7 +12,15 @@ jobs:
       - name: Install GTK4 system deps
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-4-dev libadwaita-1-dev libgtk4-layer-shell-dev
+          sudo apt-get install -y libgtk-4-dev libadwaita-1-dev libwayland-dev wayland-protocols meson ninja-build curl
+      # gtk4-layer-shell C lib ships no Ubuntu package on 24.04: build it.
+      - name: Build gtk4-layer-shell C library
+        run: |
+          curl -sL https://github.com/wmww/gtk4-layer-shell/archive/refs/tags/v1.0.4.tar.gz | tar xz -C /tmp
+          meson setup /tmp/gtk4-layer-shell-1.0.4 /tmp/gtk4-layer-shell-1.0.4/build --prefix=/usr/local -Dexamples=false -Ddocs=false -Dtests=false
+          ninja -C /tmp/gtk4-layer-shell-1.0.4/build
+          sudo ninja -C /tmp/gtk4-layer-shell-1.0.4/build install
+          sudo ldconfig
       # gtk4 0.11 needs rustc 1.92; stable may lag behind.
       - uses: dtolnay/rust-toolchain@1.92
         with:
