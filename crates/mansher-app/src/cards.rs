@@ -76,22 +76,10 @@ pub(crate) fn refresh(shared: &Shared) {
         let old = std::mem::take(&mut app.rendered);
         let mut map = std::mem::take(&mut app.card_widgets);
         let mut outers = std::mem::take(&mut app.card_outers);
-        // One copy when the row fits (no wrap, no visible duplicates),
-        // three when it overflows (the tick wraps drift by one pitch).
-        let copies = copy_count(&items, &app.size_cache, app.scroll.allocated_width());
-        app.rendered_copies = copies;
         // Release the App borrow before building widgets: card_widget
         // re-borrows shared for hover state and the size cache.
         drop(app);
-        let stats = patch_cards(
-            &cards_box,
-            &mut map,
-            &mut outers,
-            &old,
-            &items,
-            copies,
-            shared,
-        );
+        let stats = patch_cards(&cards_box, &mut map, &mut outers, &old, &items, shared);
         let mut app = shared.borrow_mut();
         app.card_widgets = map;
         app.card_outers = outers;
@@ -144,92 +132,12 @@ fn press_onset(old: &RenderedCard, new: &RenderedCard) -> bool {
 /// its neighbors — every `move` closure in `card_widget` captures only
 /// card-stable values (`id`, `path`, `shared`) plus an upgrade-guarded weak
 /// to its own cross, which dies with the card.
-/// Copies of the peg list rendered for the endless row. The user lives on
-/// the middle copy; the tick wraps the adjustment by one copy pitch at the
-/// edges, which reads as seamless because all copies are identical.
-/// Maximum: `copy_count` drops to a single copy when the whole row fits the
-/// viewport — with a short line all three copies would sit side by side and
-/// every photo would show twice.
-pub(crate) const LOOP_COPIES: u8 = 3;
-
-/// How many row copies to render: one when the row fits the viewport (no
-/// wrap needed, and duplicates would show side by side), three when it
-/// overflows. Widths come from the size cache only — never decode here;
-/// unknown widths fall back to max, which only errs toward three copies
-/// until thumbs land (and their arrival triggers a recount anyway).
-pub(crate) fn copy_count(
-    items: &[RenderedCard],
-    cache: &RefCell<SizeCache>,
-    viewport_w: i32,
-) -> u8 {
-    if items.is_empty() {
-        return 1;
-    }
-    if viewport_w <= 0 {
-        return LOOP_COPIES; // unmapped: keep today's layout, recount on map
-    }
-    let cached = cache.borrow();
-    let single: f64 = 48.0
-        + items
-            .iter()
-            .map(|r| {
-                cached
-                    .get(&r.path)
-                    .map(|&(_, _, (w, _))| w as f64)
-                    .unwrap_or(layout::PHOTO_MAX_W as f64)
-                    + 8.0
-                    + 24.0
-            })
-            .sum::<f64>();
-    if single + 64.0 <= viewport_w as f64 {
-        1
-    } else {
-        LOOP_COPIES
-    }
-}
-
-/// Wrap `v` into the middle copy's span so the endless row never shows an
-/// end. `mid_lo` is copy 1's measured start and `pitch` the measured copy
-/// width — card widths vary with aspect ratio, so the tick measures both
-/// from live widgets instead of assuming n*SPACING. Returns `v` unchanged
-/// when wrapping is unsafe: empty row, viewport wider than a copy, or no
-/// overflow at all. Pure: the tick reads the adjustment, applies the result.
-pub(crate) fn wrap_value(
-    v: f64,
-    lower: f64,
-    upper: f64,
-    page: f64,
-    mid_lo: f64,
-    pitch: f64,
-) -> f64 {
-    if pitch <= 0.0 || page > pitch || upper - page <= lower {
-        return v;
-    }
-    let mut w = v;
-    for _ in 0..4 {
-        if w < mid_lo {
-            w += pitch;
-        } else {
-            break;
-        }
-    }
-    for _ in 0..8 {
-        if w > mid_lo + pitch {
-            w -= pitch;
-        } else {
-            break;
-        }
-    }
-    w
-}
-
 fn patch_cards(
     cards: &gtk::Box,
-    map: &mut HashMap<(u8, u128), gtk::Widget>,
-    outers: &mut HashMap<(u8, u128), gtk::Overlay>,
+    map: &mut HashMap<u128, gtk::Widget>,
+    outers: &mut HashMap<u128, gtk::Overlay>,
     old: &[RenderedCard],
     new: &[RenderedCard],
-    copies: u8,
     shared: &Shared,
 ) -> (usize, usize, bool) {
     let old_ids: Vec<u128> = old.iter().map(|r| r.frame.id).collect();
@@ -250,10 +158,10 @@ fn patch_cards(
     if new_ids.starts_with(&survivors_in_old_order) {
         let mut built = 0;
         let mut removed = 0;
-        // Drop every copy of pegs that left the line.
-        let stale: Vec<(u8, u128)> = map
+        // Drop pegs that left the line.
+        let stale: Vec<u128> = map
             .keys()
-            .filter(|(_, id)| !new_ids.contains(id))
+            .filter(|id| !new_ids.contains(id))
             .copied()
             .collect();
         for key in stale {
@@ -264,51 +172,46 @@ fn patch_cards(
             outers.remove(&key);
         }
         let mut prev: Option<gtk::Widget> = None;
-        for copy in 0..copies {
-            for r in new {
-                let id = r.frame.id;
-                let key = (copy, id);
-                let old_o = old.iter().find(|o| o.frame.id == id);
-                let same = old_o.is_some_and(|o| *o == *r) && map.contains_key(&key);
-                if same {
-                    prev = map.get(&key).cloned();
+        for r in new {
+            let id = r.frame.id;
+            let old_o = old.iter().find(|o| o.frame.id == id);
+            let same = old_o.is_some_and(|o| *o == *r) && map.contains_key(&id);
+            if same {
+                prev = map.get(&id).cloned();
+                continue;
+            }
+            if let Some(o) = old_o {
+                if press_onset(o, r) {
+                    // Press began: swap phase classes in place.
+                    // Rebuilding here would destroy the gesture's own
+                    // widget — press without release, click without fire.
+                    if let Some(outer) = outers.get(&id) {
+                        for cls in phase_classes(&o.frame) {
+                            outer.remove_css_class(&cls);
+                        }
+                        for cls in phase_classes(&r.frame) {
+                            outer.add_css_class(&cls);
+                        }
+                    }
+                    prev = map.get(&id).cloned();
                     continue;
                 }
-                if let Some(o) = old_o {
-                    if press_onset(o, r) {
-                        // Press began: swap phase classes on every live copy.
-                        // Rebuilding here would destroy the gesture's own
-                        // widget — press without release, click without fire.
-                        for c in 0..copies {
-                            if let Some(outer) = outers.get(&(c, id)) {
-                                for cls in phase_classes(&o.frame) {
-                                    outer.remove_css_class(&cls);
-                                }
-                                for cls in phase_classes(&r.frame) {
-                                    outer.add_css_class(&cls);
-                                }
-                            }
-                        }
-                        prev = map.get(&key).cloned();
-                        continue;
-                    }
-                }
-                if let Some(old_w) = map.remove(&key) {
-                    cards.remove(&old_w);
-                }
-                outers.remove(&key);
-                let (w, outer) = card_widget(shared, &r.frame, &r.path, r.badge);
-                match &prev {
-                    Some(p) => cards.insert_child_after(&w, Some(p)),
-                    None => cards.insert_child_after(&w, None::<&gtk::Widget>),
-                }
-                map.insert(key, w.clone());
-                outers.insert(key, outer);
-                prev = Some(w);
-                built += 1;
             }
+            if let Some(old_w) = map.remove(&id) {
+                cards.remove(&old_w);
+            }
+            outers.remove(&id);
+            let (w, outer) = card_widget(shared, &r.frame, &r.path, r.badge);
+            match &prev {
+                Some(p) => cards.insert_child_after(&w, Some(p)),
+                None => cards.insert_child_after(&w, None::<&gtk::Widget>),
+            }
+            map.insert(id, w.clone());
+            outers.insert(id, outer);
+            prev = Some(w);
+            built += 1;
         }
-        debug_assert_eq!(map.len(), copies as usize * new.len());
+        debug_assert_eq!(map.len(), new.len());
         (built, removed, false)
     } else {
         let mut cleared = 0;
@@ -319,14 +222,12 @@ fn patch_cards(
         map.clear();
         outers.clear();
         let mut built = 0;
-        for copy in 0..copies {
-            for r in new {
-                let (w, outer) = card_widget(shared, &r.frame, &r.path, r.badge);
-                cards.append(&w);
-                map.insert((copy, r.frame.id), w);
-                outers.insert((copy, r.frame.id), outer);
-                built += 1;
-            }
+        for r in new {
+            let (w, outer) = card_widget(shared, &r.frame, &r.path, r.badge);
+            cards.append(&w);
+            map.insert(r.frame.id, w);
+            outers.insert(r.frame.id, outer);
+            built += 1;
         }
         (built, cleared, true)
     }
@@ -1124,55 +1025,6 @@ mod tests {
             &rendered_card(7, Phase::Pressed, false),
             &rest
         ));
-    }
-
-    #[test]
-    fn copy_count_single_when_row_fits_triple_when_overflowing() {
-        let cache = RefCell::new(SizeCache::new());
-        let one = vec![rendered_card(1, Phase::Rest, false)];
-        assert_eq!(copy_count(&one, &cache, 1920), 1);
-        assert_eq!(copy_count(&one, &cache, 0), LOOP_COPIES);
-        assert_eq!(copy_count(&[], &cache, 1920), 1);
-        // Unknown widths fall back to max: 8 max-wide cards overflow 1920.
-        let many: Vec<RenderedCard> = (1..=8)
-            .map(|id| rendered_card(id, Phase::Rest, false))
-            .collect();
-        assert_eq!(copy_count(&many, &cache, 1920), LOOP_COPIES);
-        // Known narrow thumbs fit: same 8 at 100px each stay single.
-        for r in &many {
-            cache
-                .borrow_mut()
-                .insert(r.path.clone(), (1, 1, (100, 100)));
-        }
-        assert_eq!(copy_count(&many, &cache, 1920), 1);
-    }
-
-    #[test]
-    fn wrap_value_keeps_viewport_on_middle_copy() {
-        // pitch 1944 (6 cards x 324), page 1920: copies span [24, 5856],
-        // middle copy [1968, 3912].
-        let (lower, upper, page, mid_lo, pitch) =
-            (0.0, 24.0 + 3.0 * 1944.0, 1920.0, 24.0 + 1944.0, 1944.0);
-        assert_eq!(
-            wrap_value(2000.0, lower, upper, page, mid_lo, pitch),
-            2000.0
-        );
-        // Drifted into copy 0 → forward one pitch.
-        assert_eq!(wrap_value(100.0, lower, upper, page, mid_lo, pitch), 2044.0);
-        // Drifted into copy 2 → back one pitch.
-        assert_eq!(
-            wrap_value(5000.0, lower, upper, page, mid_lo, pitch),
-            3056.0
-        );
-        // No overflow → untouched.
-        assert_eq!(wrap_value(0.0, 0.0, 100.0, 1920.0, 24.0, 1944.0), 0.0);
-        // Viewport wider than a copy → untouched.
-        assert_eq!(
-            wrap_value(100.0, lower, upper, 2000.0, mid_lo, pitch),
-            100.0
-        );
-        // Empty row → untouched.
-        assert_eq!(wrap_value(0.0, 0.0, 48.0, 1920.0, 24.0, 0.0), 0.0);
     }
 
     #[test]

@@ -110,12 +110,11 @@ struct App {
     /// diffs against this (not `last_frames`: the tick overwrites that gate
     /// copy before refresh runs, and it carries no badge/thumb info).
     rendered: Vec<cards::RenderedCard>,
-    /// (copy, card identity) → live widget. The row renders three copies of
-    /// the peg list for the endless wrap; never key on widget index.
-    card_widgets: HashMap<(u8, u128), gtk::Widget>,
-    /// (copy, card identity) → phase-class node for in-place restyles (press
-    /// swaps classes on every live copy instead of rebuilding mid-gesture).
-    card_outers: HashMap<(u8, u128), gtk::Overlay>,
+    /// card identity → live widget. Keyed by peg id, never by widget index.
+    card_widgets: HashMap<u128, gtk::Widget>,
+    /// card identity → phase-class node for in-place restyles (press
+    /// swaps classes in place instead of rebuilding mid-gesture).
+    card_outers: HashMap<u128, gtk::Overlay>,
     /// `photo_display_size` memo, pruned to live paths on every refresh.
     size_cache: RefCell<cards::SizeCache>,
     clip_guard: clipwatch::ClipGuard,
@@ -131,10 +130,6 @@ struct App {
     /// (thumb landing, badge flip) must not replay it mid-flight, or the
     /// card visibly drops twice.
     arrived: HashSet<u128>,
-    /// Row copies currently rendered (1 when the row fits the viewport,
-    /// 3 when it overflows for the endless wrap). The tick recounts and
-    /// refreshes on change.
-    rendered_copies: u8,
 }
 
 type Shared = Rc<RefCell<App>>;
@@ -540,7 +535,6 @@ fn build_ui(
         tick_count: 0,
         tuck_gen: 0,
         arrived: HashSet::new(),
-        rendered_copies: 3,
     }));
 
     // Upstream itemsChanged: a non-empty line is wanted from the start.
@@ -836,66 +830,12 @@ fn build_ui(
                 app.last_frames = frames;
                 dirty = true;
             }
-            // Row copies: a short row fits the viewport (single copy, no
-            // visible duplicates); a long one needs all three for the wrap.
-            // Recount here so resize/overflow flips rebuild once, not never.
-            let copies = crate::cards::copy_count(
-                &app.rendered,
-                &app.size_cache,
-                app.scroll.allocated_width(),
-            );
-            if copies != app.rendered_copies {
-                dirty = true;
-            }
         }
 
         if dirty {
             cards::refresh(&shared);
         }
 
-        // Endless row wrap: three copies render in `cards` and the user lives
-        // on the middle one; a drift into an outer copy shifts the adjustment
-        // by exactly one copy pitch (see cards::wrap_value). follow_tail still
-        // owns the newest end; this only recenters wheel drifters.
-        {
-            // Measure the real copy geometry from live widgets: card widths
-            // vary with aspect ratio, so n*SPACING overshoots and the
-            // downward wrap threshold lands past the true end (scroll-down
-            // wall). Copy 1's start is the wrap band's lower edge.
-            // No wrap while following the tail (the pin owns the newest end;
-            // wrapping would yank it away and fight the changed handler at
-            // 10Hz) or while a menu is open (the popover would detach from
-            // its card).
-            let hold = shared.borrow().follow_tail.get() || shared.borrow().menu_pop.is_some();
-            let measured: Option<(f64, f64)> = (|| {
-                if hold {
-                    return None;
-                }
-                let app = shared.borrow();
-                let id = app.card_outers.keys().find(|k| k.0 == 0).map(|k| k.1)?;
-                let w0 = app.card_outers.get(&(0, id))?.clone();
-                let w1 = app.card_outers.get(&(1, id))?.clone();
-                let cards_box = app.cards.clone();
-                drop(app);
-                let (x0, _) = w0.translate_coordinates(&cards_box, 0.0, 0.0)?;
-                let (x1, _) = w1.translate_coordinates(&cards_box, 0.0, 0.0)?;
-                (x1 > x0).then_some((x1, x1 - x0))
-            })();
-            if let Some((mid_lo, pitch)) = measured {
-                let adj = shared.borrow().scroll.hadjustment();
-                let w = cards::wrap_value(
-                    adj.value(),
-                    adj.lower(),
-                    adj.upper(),
-                    adj.page_size(),
-                    mid_lo,
-                    pitch,
-                );
-                if w != adj.value() {
-                    adj.set_value(w);
-                }
-            }
-        }
         gtk::glib::ControlFlow::Continue
     });
 
